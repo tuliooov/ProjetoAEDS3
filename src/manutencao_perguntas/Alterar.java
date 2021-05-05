@@ -23,17 +23,28 @@ public class Alterar implements Comando {
   public boolean run() {
     try {
       Pergunta t = null;
-      ConsoleView.PrintBaseMessage("Qual o id da pergunta que você gostaria de alterar?\n");
-      int p = leitor.nextInt();
-
-      LinkedList<Pergunta> perguntas = Controlador.PegarInstancia().ReadAll(EnumeradorCrud.PERGUNTAS, id);
+      LinkedList<Pergunta> perguntas = Controlador.PegarInstancia().ReadAll(EnumeradorCrud.PERGUNTAS, ManutencaoPerguntas.getInstance().usuario.getID());
 
       if (perguntas != null) {
         for (int i = 0; i < perguntas.size(); i++) {
-          if (t != null && perguntas.get(i).getID() == p) {
+          ConsoleView.PrintBaseMessage(perguntas.get(i).getID() + " | " + perguntas.get(i).getPergunta() + "\n");
+          // if (t != null && perguntas.get(i).getID() == p) {
+          //   t = perguntas.get(i);
+          // }
+        }
+
+        
+        ConsoleView.PrintBaseMessage("Qual o id da pergunta que você gostaria de alterar?\n");
+        int p = leitor.nextInt();
+
+        for (int i = 0; i < perguntas.size(); i++) {
+          if (perguntas.get(i).getID() == p) {
             t = perguntas.get(i);
+            break;
           }
         }
+
+        
         if (t != null) {
 
           Pergunta perguntaOb = (Pergunta) Controlador.PegarInstancia().Read(EnumeradorCrud.PERGUNTAS , t.getID());
