@@ -47,7 +47,7 @@ public class CRUD<T extends Registro> {
    */
   public int create(T objeto) throws IOException {
 
-    System.out.println("criar objeto" + objeto);
+    // System.out.println("criar objeto" + objeto);
     arquivo.seek(0); // inicio do arquivo
     int id = arquivo.readInt() + 1; // leitura do ultimo id no cabeçalho
     objeto.setID(id);
@@ -79,7 +79,7 @@ public class CRUD<T extends Registro> {
 
   public int create2(T objeto) throws IOException {
 
-    System.out.println("criar objeto" + objeto);
+    // System.out.println("criar objeto" + objeto);
     arquivo.seek(0); // inicio do arquivo
     int id = arquivo.readInt() + 1; // leitura do ultimo id no cabeçalho
     objeto.setID(id);
@@ -117,7 +117,7 @@ public class CRUD<T extends Registro> {
 
       int[] lido = indexIndireto.read(idUsuario);
 
-      System.out.println("lido>"+lido.length);
+      // System.out.println("lido>"+lido.length);
       for(int i = 0; i < lido.length; i++){
         objeto = construtor.newInstance();
         objeto = this.read(lido[i]);
@@ -196,7 +196,7 @@ public class CRUD<T extends Registro> {
    */
   public boolean update(T objetoNovo) throws IOException {
     boolean success = false; // controle
-    System.out.println("objetoNovo> "+ objetoNovo);
+    // System.out.println("objetoNovo> "+ objetoNovo);
     try {
       long pos = indexDireto.read(objetoNovo.getID()); // posição de atualização
 

@@ -67,13 +67,13 @@ public class Controlador<T extends Registro> {
 
   public LinkedList<T> ReadAll(EnumeradorCrud enume, int idUsuario) throws Exception {
     try{
-      System.out.println("idusuario> "+ idUsuario);
+      // System.out.println("idusuario> "+ idUsuario);
       LinkedList<T> lista = PegarCrudPorTipoDeClasse(enume).readAll(idUsuario);
 
-      System.out.println("\n\nlistatamanho> " + lista.size());
-      for(int i = 0; i < lista.size(); i++){
-        System.out.println("\n\nlista> " + lista.get(i));
-      }
+      // System.out.println("\n\nlistatamanho> " + lista.size());
+      // for(int i = 0; i < lista.size(); i++){
+        // System.out.println("\n\nlista> " + lista.get(i));
+      // }
       return lista;
 
     }catch(Exception e){

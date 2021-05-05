@@ -31,11 +31,16 @@ public class Listagem implements Comando {
         ConsoleView.PrintBaseMessage("MINHAS PERGUNTAS: \n");
         for (int i = 0; i < perguntas.size(); i++) {
           t = perguntas.get(i);
+          
+          if(perguntas.get(i).getAtiva() == 1){
+            ConsoleView.PrintBaseMessage(t.getPergunta() + ("\n"));
+          }else{
+            ConsoleView.PrintBaseMessage("(Arquivada) "+t.getPergunta() + ("\n"));
+          }
           // SimpleDateFormat ft = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss");
           // mensagem += (i + 1) + ". " + ((t.isAtiva() == true) ? "(Arquivada)" : "") + "\n"
           //     + "\n" + t.getPergunta();
-              // + ft.format(new Date(t.getCriacao()) + "\n" + t.getPergunta());
-          ConsoleView.PrintBaseMessage(t.getPergunta() + ("\n"));
+          // + ft.format(new Date(t.getCriacao()) + "\n" + t.getPergunta());
         }
         ConsoleView.PrintBaseMessage("Pressione qualquer tecla para continuar...");
         leitor.nextLine();

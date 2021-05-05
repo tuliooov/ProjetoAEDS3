@@ -23,18 +23,28 @@ public class Arquivar implements Comando {
   public boolean run() {
     try {
       Pergunta t = null;
-      ConsoleView.PrintBaseMessage("Qual o id da pergunta que você gostaria de alterar?\n");
-      int pergunta = leitor.nextInt();
       LinkedList<Pergunta> perguntas = Controlador.PegarInstancia().ReadAll(EnumeradorCrud.PERGUNTAS, id);
+      
       if (perguntas != null) {
         for (int i = 0; i < perguntas.size(); i++) {
-          if (t != null && perguntas.get(i).getID() == pergunta) {
+          if(perguntas.get(i).getAtiva() == 1){
+            ConsoleView.PrintBaseMessage(perguntas.get(i).getID() + " | " + perguntas.get(i).getPergunta() + "\n");
+          }
+        }
+        
+        ConsoleView.PrintBaseMessage("Qual o id da pergunta que você gostaria de alterar?\n");
+        int pergunta = leitor.nextInt();
+        
+        for (int i = 0; i < perguntas.size(); i++) {
+          if (perguntas.get(i).getID() == pergunta) {
             t = perguntas.get(i);
           }
         }
+
+
         if (t != null) {
           Pergunta perguntaOb = (Pergunta) Controlador.PegarInstancia().Read(EnumeradorCrud.PERGUNTAS, t.getID());
-          perguntaOb.setAtiva(true);
+          perguntaOb.setAtiva(false);
           boolean b = Controlador.PegarInstancia().Update(EnumeradorCrud.PERGUNTAS, perguntaOb);
           if (b) {
             ConsoleView.PrintSuccessMessage("Pergunta arquivada com sucesso");

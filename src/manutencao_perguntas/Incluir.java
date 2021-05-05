@@ -27,14 +27,14 @@ public class Incluir implements Comando {
       Pergunta p = new Pergunta();
       p.setPergunta(pergunta);
 
-      System.out.println("IDUSUARIO>" + ManutencaoPerguntas.getInstance().usuario.getID());
+      // System.out.println("IDUSUARIO>" + ManutencaoPerguntas.getInstance().usuario.getID());
 
       p.setIdUsuario(ManutencaoPerguntas.getInstance().usuario.getID()); 
 
       int id = Controlador.PegarInstancia().Create(EnumeradorCrud.PERGUNTAS, p);
 
-      System.out.println("PERGUNTA" + p);
-      System.out.println("ID PERGUNT INSERIDA" + id);
+      // System.out.println("PERGUNTA" + p);
+      // System.out.println("ID PERGUNT INSERIDA" + id);
       if (id != -1) {
         ConsoleView.PrintSuccessMessage("Pergunta inserida com sucesso");
       } else {

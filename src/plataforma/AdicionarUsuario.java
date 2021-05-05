@@ -33,7 +33,7 @@ public class AdicionarUsuario implements Comando {
 
       Usuario us = (Usuario) Controlador.PegarInstancia().Read( EnumeradorCrud.USUARIOS, email.hashCode());
       
-      System.out.println("tem usuario com email> "+us);
+      // System.out.println("tem usuario com email> "+us);
 
       if (us != null && us.getEmail().equals(newUser.getEmail())) {
         ConsoleView.PrintWarningMessage("\nFalha! Seu email já esta cadastrado.\n");

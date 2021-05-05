@@ -28,7 +28,7 @@ public class ResetarSenha implements Comando {
       // Controlador vem aqui  
       Usuario us = (Usuario) Controlador.PegarInstancia().Read(EnumeradorCrud.USUARIOS, newUserPassword.getEmail().hashCode());
 
-      System.out.println("encontrei usuario"+us);
+      // System.out.println("encontrei usuario"+us);
 
       if (us.getEmail().equals(newUserPassword.getEmail())) {
         ConsoleView.PrintSuccessMessage("\nEncontramos seu email.!\n");
