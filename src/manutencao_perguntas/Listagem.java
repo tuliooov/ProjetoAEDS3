@@ -35,7 +35,7 @@ public class Listagem implements Comando {
           if(perguntas.get(i).getAtiva() == 1){
             ConsoleView.PrintBaseMessage(t.getPergunta() + ("\n"));
           }else{
-            ConsoleView.PrintBaseMessage("(Arquivada) "+t.getPergunta() + ("\n"));
+            ConsoleView.PrintBaseMessage("(Arquivada) "+ t.getPergunta() + ("\n"));
           }
           // SimpleDateFormat ft = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss");
           // mensagem += (i + 1) + ". " + ((t.isAtiva() == true) ? "(Arquivada)" : "") + "\n"
