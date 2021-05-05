@@ -1,0 +1,608 @@
+package util;
+import java.io.*;
+import java.text.DecimalFormat;
+import interfaces.Registro;
+import java.lang.reflect.Constructor;
+
+public class CRUD<T extends Registro> {
+    private RandomAccessFile arquivoPrincipal;
+    private RandomAccessFile arquivoIndices;
+
+    public final Constructor<T> constructor;
+
+     public CRUD(Constructor<T> constructor, String fileName) throws Exception {
+        this.constructor = constructor;
+        this.arquivoPrincipal = new RandomAccessFile("database/"+fileName+".db", "rw");
+        this.arquivoIndices = new RandomAccessFile("database/"+fileName+"idx", "rw");
+
+        arquivoPrincipal.seek(0);
+        if(arquivoPrincipal.length() == 0){
+          arquivoPrincipal.seek(0);
+          arquivoPrincipal.writeInt(0);
+        }
+        if(arquivoIndices.length() == 0){
+          arquivoPrincipal.seek(0);
+          arquivoIndices.writeInt(0);
+        }
+        
+    }
+
+
+    public int create(T user, String principal, String indice) throws IOException{
+      return create(user, new File(principal), new File(indice));
+    }
+
+    public int create(T user, RandomAccessFile arquivo, RandomAccessFile indice) throws IOException{
+      arquivoPrincipal = arquivo;
+      arquivoIndices = indice;
+      return create(user);
+    }
+
+    public int create(T user, File arquivo, File indice)throws IOException{
+      arquivoPrincipal = new RandomAccessFile(arquivo,"rw");
+      arquivoIndices = new RandomAccessFile(indice,"rw");
+      return create(user);
+    }
+
+    public int create(T user) throws IOException {
+        
+        arquivoPrincipal.seek(0);    //inicio do arquivoPrincipaluivo
+        
+        int id = arquivoPrincipal.readInt()+1;   //pegando o id
+
+        int indiceId = user.getID();
+
+        user.setID(id);    //colocando o id que pegou dentro do user
+
+        byte[] arrayByte = user.toByteArray(); //criando o objeto em byte
+        arquivoPrincipal.seek(arquivoPrincipal.length());     //indo para o final do arquivoPrincipaluivo
+
+        long enderecoRegistro = arquivoPrincipal.getFilePointer();
+
+        arquivoPrincipal.writeChar(' ');     //posicao aonde verifica se ele foi deletado
+        arquivoPrincipal.writeInt(arrayByte.length);    //escrever o tamanho do registro
+
+        arquivoPrincipal.write(arrayByte);     //escrever o objeto
+
+        arquivoPrincipal.seek(0);    //voltar para a posicao inicial
+        arquivoPrincipal.writeInt(id);   //atualizar o ultimo id
+
+
+        //escrevendo no indice
+        arquivoIndices.seek(0);
+        int qtdIndices = arquivoIndices.readInt();
+        arquivoIndices.seek(arquivoIndices.length());
+        arquivoIndices.writeInt(indiceId);
+        arquivoIndices.writeLong(enderecoRegistro);
+        arquivoIndices.seek(0);
+        // System.out.println("qtdIndices+1: "+ (qtdIndices+1));
+        arquivoIndices.writeInt(qtdIndices+1);
+        
+
+        return id;
+    }
+
+    // public T read(Class<T> targetClass, int id, String arquivo, String indice) throws IOException{
+    //   return read(targetClass,id,new File(arquivo),new File(indice));
+    // }
+
+    // public T read(Class<T> targetClass, int id, RandomAccessFile arquivo,RandomAccessFile indice) throws IOException{
+    //   arquivoPrincipal = arquivo;
+    //   arquivoIndices = indice;
+    //   return read(targetClass, id);
+    // }
+    
+    // public T read(Class<T> targetClass, int id,File arquivo,File indice) throws IOException{
+    //   arquivoPrincipal = new RandomAccessFile(arquivo,"rw");
+    //   arquivoIndices = new RandomAccessFile(indice,"rw");
+    //   return read(targetClass, id);
+    // }
+
+    public T read(int id) throws IOException{
+      // System.out.println("\nMETODO read\n");
+      T user = null;
+      try{
+        user = this.constructor.newInstance();
+
+        arquivoIndices.seek(0);
+        int qtdIndices = arquivoIndices.readInt();
+        // System.out.println("qtdIndices: "+qtdIndices);
+        Boolean encontrou = false;
+        Long endereco = null;
+        for(int i = 0; i < qtdIndices; i++){
+            int idIndice = arquivoIndices.readInt();
+            endereco = arquivoIndices.readLong();
+            // System.out.println("\nidIndice: "+idIndice);
+            // System.out.println("\nid: "+id);
+            if(idIndice == id){
+                i = qtdIndices;
+                encontrou = true;
+            }
+        }
+
+        if(encontrou == false){
+            return user;
+        }
+
+        arquivoPrincipal.seek(endereco);
+        char lapide = arquivoPrincipal.readChar();
+        int qtdBytes = arquivoPrincipal.readInt();
+        byte[] userBytes = new byte[qtdBytes];
+        arquivoPrincipal.read(userBytes);
+        user.fromByteArray(userBytes);
+        if(user.getID() != id){
+            user = this.constructor.newInstance();
+        }else{
+            arquivoPrincipal.seek(arquivoPrincipal.length());
+        }
+      }catch(Exception e){
+        throw new IOException();
+      }
+        return user;
+    }
+
+    public  Boolean update(T user) throws IOException{
+        try{
+
+          arquivoIndices.seek(0);
+        int qtdIndices = arquivoIndices.readInt();
+        Long enderecoIndice = null;
+        Long endereco = null;
+        for(int i = 0; i < qtdIndices; i++){
+            int idIndice = arquivoIndices.readInt();
+            enderecoIndice = arquivoIndices.getFilePointer();
+            endereco = arquivoIndices.readLong();
+
+            if(idIndice == user.getID()){
+                i = qtdIndices;
+            }
+        }
+
+        arquivoPrincipal.seek(endereco);
+
+        if(arquivoPrincipal.readChar() != '*'){      // se não for deletado
+            int qtdBytes = arquivoPrincipal.readInt();       //pegar qtd bytes
+            T userTemp = this.constructor.newInstance();
+            byte[] userBytes = new byte[qtdBytes];     
+            arquivoPrincipal.read(userBytes);       //guardando dentro de userBytes
+            userTemp.fromByteArray(userBytes);        //criando classe
+
+            if(userTemp.getID() == user.getID()){     //se for o a classe procurada para atualizar
+
+                //atualiando
+                byte[] arrayByte = user.toByteArray(); //criando o objeto em byte
+
+                if(arrayByte.length <= qtdBytes ){      // se couber no mesmo registro
+                    arquivoPrincipal.seek(endereco);      //voltar posicao inicial do registro
+                    arquivoPrincipal.writeChar(' ');     //marcar como ainda existente
+                    arquivoPrincipal.readInt();      //ler para pular o tamanho registro
+                    arquivoPrincipal.write(arrayByte);       //escrever classe
+
+                    
+                }else{      // senão couber no mesmo registro
+                    arquivoPrincipal.seek(endereco);      
+                    arquivoPrincipal.writeChar('*');
+                    arquivoPrincipal.seek(arquivoPrincipal.length());
+                    Long novoEnderecoRegistro = arquivoPrincipal.getFilePointer();
+                    arquivoPrincipal.writeChar(' ');     //posicao aonde verifica se ele foi deletado
+                    arquivoPrincipal.writeInt(arrayByte.length);    //escrever o tamanho do registro
+                    arquivoPrincipal.write(arrayByte);     //escrever o objeto
+                    arquivoIndices.seek(enderecoIndice);
+                    arquivoIndices.writeLong(novoEnderecoRegistro);
+                }
+                return true;
+            }
+            
+        }else{      // se for deletado
+            int qtdBytes = arquivoPrincipal.readInt();   //pular qtd deletada
+            arquivoPrincipal.read(new byte[qtdBytes]);   //pular classe deletada
+        }
+        }catch(Exception e){
+          throw new IOException();
+        }
+        return false;
+    }
+
+    public  Boolean delete(int id, RandomAccessFile arquivo, RandomAccessFile indice) throws IOException{
+      arquivoPrincipal = arquivo;
+      arquivoIndices = indice;
+      return delete(id);
+    }
+
+    public  Boolean delete(int id, String arquivo, String indice) throws IOException{
+      return delete(id, new File(arquivo), new File(indice));
+    }
+    
+    public  Boolean delete(int id, File arquivo, File indice) throws IOException{
+      arquivoPrincipal = new RandomAccessFile(arquivo,"rw");
+      arquivoIndices = new RandomAccessFile(indice,"rw");
+      return delete(id);
+
+    }
+    public  Boolean delete(int id) throws IOException{
+
+        arquivoIndices.seek(0);
+        int qtdIndices = arquivoIndices.readInt();
+        Long enderecoIndice = null;
+        Long endereco = null;
+        for(int i = 0; i < qtdIndices; i++){
+            enderecoIndice = arquivoIndices.getFilePointer();
+            int idIndice = arquivoIndices.readInt();
+            endereco = arquivoIndices.readLong();
+
+            if(idIndice == id){
+                arquivoIndices.seek(enderecoIndice);
+                arquivoIndices.writeInt(-1);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+}
+
+===============================
+ */
+    public static void ListarPerguntas() {
+
+        System.out.println("\n----------- LISTAGEM -------------");
+        try {
+            int[] indices = indicePerguntasUsuarios.read(IDLogado); // recupera os IDs das perguntas criadas pelo usuário
+            if (indices.length == 0) { // caso não tenha nenhum ID registrado
+                System.out.println("Nenhuma pergunta cadastrada!");
+
+            } else {
+
+                // pra cada ID gera uma pergunta
+                for (int i = 0; i < indices.length; i++) {
+                    Pergunta p = arqPerguntas.read(indices[i]);
+
+                    if (p.getAtiva() == false) { // Se ela estiver arquivada
+                        System.out.print("\n-----| ARQUIVADA |-----");
+                    }
+
+                    // Escreve a pergunta na tela
+                    System.out.print("\nQUESTÃO N." + (i + 1));
+                    System.out.println(p.toString());
+                }
+            }
+
+            System.out.print("\nDigite enter para continuar...");
+            br.read();
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    /**
+     * Inclui novas perguntas
+     */
+    public static void IncluirPerguntas() {
+
+        long time = System.currentTimeMillis() - 10800000; // Hora de criação da pergunta
+
+        System.out.println("\n----------- INCLUSÃO -------------\n");
+        System.out.print("\nPergunta: ");
+
+        try {
+            String pergunta = br.readLine(); // leitura da pergunta
+
+            System.out.print("\nDigite as palavras chave da sua pergunta, separadas por (;): ");
+            String pc = Biblioteca.toKeyWord(br.readLine());
+
+            if ((!pergunta.equals("")) && (!pc.equals(""))) { // se a pergunta não estiver vazia
+
+                Pergunta question = new Pergunta(); // criação da pergunta
+
+                System.out.println("\nPergunta Válida!\n");
+                question.setPergunta(pergunta); // define o atributo pergunta
+                question.setPalavrasChave(pc); // define o atributo palavras chave
+
+                System.out.println("Pergunta: " + pergunta);
+                System.out.println("Palavras Chaves: " + pc);
+
+                int op = -1;
+                while (op != 1 && op != 2) {
+                    System.out.println("\nConfirmar pergunta?");
+
+                    System.out.println("\n1) Sim\n2) Não");
+                    System.out.print("\nOperação: ");
+                    op = leitor.nextInt();
+                    if (op == 1) {
+                        question.setNota((short) 0); // define o atributo nota
+                        question.setCriacao(time); // define o atributo criação
+                        question.setIDUsuario(IDLogado); // devine o atributo id do usuario
+
+                        String[] keyWords = pc.split(";"); // separa as palavras chave
+
+                        int idPergunta = arqPerguntas.create(question); // cria a pergunta no arquivo
+                        indicePerguntasUsuarios.create(IDLogado, idPergunta); // cria a relação pergunta : usuario
+
+                        for (int i = 0; i < keyWords.length; i++) {
+                            indicePalavrasChave.create(keyWords[i], idPergunta); // cria a relação palavra chave : pergunta
+                        }
+
+                        System.out.println("\nPERGUNTA CADASTRADA!");
+
+                    } else if (op == 2) {
+                        System.out.println("Operação Cancelada.");
+
+                    } else
+                        System.out.println("Opção Inválida!");
+                }
+            } else {
+                System.out.println("\nERRO! Pergunta ou palavras-chave vazias!");
+            }
+
+            System.out.print("\nDigite enter para continuar...");
+            br.read();
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    /**
+     * Altera perguntas já existentes
+     */
+    public static void AlterarPerguntas() {
+
+        System.out.println("\n----------- ALTERAR -------------\n");
+        try {
+
+            int[] indices = indicePerguntasUsuarios.read(IDLogado); // recupera os IDs registrados pelo usuário logado
+            Pergunta p;
+            Pergunta ativas[] = new Pergunta[indices.length];
+
+            for (int i = 0, j = 0; i < indices.length; i++) {
+                p = arqPerguntas.read(indices[i]);
+
+                if (p.getAtiva() == true) {
+                    ativas[j] = p;
+                    j++;
+                }
+            }
+            // Pergunta p;
+
+            if (indices.length == 0 || ativas[0] == null) { // se não houver nenhuma pergunta
+                System.out.println("Nenhuma pergunta cadastrada!");
+
+            } else {
+
+                // escreve as perguntas na tela através dos IDs
+                for (int i = 0; i < ativas.length; i++) {
+
+                    System.out.print("\nQUESTÃO N." + (i + 1));
+                    System.out.println(ativas[i]);
+
+                }
+
+                String aux = "";
+                int op = -1;
+
+                System.out.println("\n0) Voltar");
+                System.out.print("\nInforme o número da questão que deseja modificar: ");
+
+                op = leitor.nextInt() - 1;
+
+                // erro se o usuário digitar um valor fora do domínio
+                while (op < -1 && op >= ativas.length) {
+
+                    System.out.print("ERRO: Pergunta inexistente. Por favor, informe uma operação válida: ");
+                    op = leitor.nextInt() - 1;
+                }
+
+                if (op != -1) {
+                    System.out.println("\nPergunta que deseja modificar:");
+
+                    p = ativas[op]; // criação da pergunta através da posição escolhida pelo usuário
+                    System.out.println(p);
+
+                    System.out.print("\nNOVA PERGUNTA: ");
+                    String novaPergunta = br.readLine();
+
+                    if (novaPergunta.equals("")) { // se a pergunta estiver vazia
+                        System.out.println("ERRO! Pergunta vazia.");
+
+                    } else { // confirmação da alteração da pergunta
+
+                        System.out.println("\nDeseja alterar as palavras chave também?");
+                        System.out.println("\n1) Sim\n2) Não");
+                        System.out.print("\nOperação: ");
+                        int cf = leitor.nextInt();
+
+                        while (cf != 1 && cf != 2) {
+
+                            System.out.println("ERRO! Operação Inválida!");
+
+                            System.out.println("\nDeseja alterar as palavras chave também?");
+                            System.out.println("\n1) Sim\n2) Não");
+
+                            cf = leitor.nextInt();
+                        }
+
+                        if (cf == 1) {
+
+                            System.out.print("\nDigite as palavras chave da nova pergunta, separadas por (;): ");
+                            aux = Biblioteca.toKeyWord(br.readLine());
+
+                            while (aux == "") {
+                                System.out.println("ERRO! Nenhuma palavra escrita!");
+
+                                System.out.print("\nDigite as palavras chave da nova pergunta, separadas por (;): ");
+                                aux = Biblioteca.toKeyWord(br.readLine());
+                            }
+
+                            System.out.println("\nDeseja confirmar a atualização da pergunta e das palavras chave?");
+                            System.out.println("\nPergunta alterada: " + novaPergunta);
+                            System.out.println("Palavras chave atualizadas: " + aux);
+                            System.out.println("\n1) Sim\n2) Não");
+                            System.out.print("\nOperação: ");
+
+                            cf = leitor.nextInt();
+
+                            while (cf != 1 && cf != 2) {
+                                System.out.print("ERRO: Operação inválida! Você deseja confirmar a atualização? ");
+                                cf = leitor.nextInt();
+                            }
+
+                            if (cf == 1) {
+                                // palavras chave antigas
+                                String[] palavrasChaves = p.getPalavrasChave().split(";"); // recupera as palavras chave
+
+                                for (int i = 0; i < palavrasChaves.length; i++) {
+                                    indicePalavrasChave.delete(palavrasChaves[i], p.getID()); // apaga cada palavra chave
+                                }
+
+                                // palavras chave atuais
+                                String[] keyWords = aux.split(";");
+                                for (int i = 0; i < keyWords.length; i++) {
+                                    indicePalavrasChave.create(keyWords[i], p.getID()); // cria a relação palavra chave : pergunta
+                                }
+
+                                p.setPergunta(novaPergunta); // muda a pergunta
+                                p.setPalavrasChave(aux); // muda as palavras chave
+                                // arqPerguntas.update(p); // atualiza o arquivo
+
+                                if (arqPerguntas.update(p)) {
+                                    System.out.println("Alteração realizada com sucesso!");
+                                } else {
+                                    System.out.println("Erro na alteração!");
+                                }
+
+                            } else if (cf == 2) {
+                                System.out.println("Operação Cancelada.");
+                            }
+                        } else {
+
+                            System.out.println("\nDeseja confirmar a alteração da pergunta?");
+                            System.out.println("\nPergunta alterada: " + novaPergunta);
+                            System.out.println("\n1) Sim\n2) Não");
+                            System.out.print("\nOperação: ");
+
+                            cf = leitor.nextInt();
+
+                            while (cf != 1 && cf != 2) {
+                                System.out.print("ERRO: Operação inválida! Você deseja confirmar a atualização? ");
+                                cf = leitor.nextInt();
+                            }
+
+                            if (cf == 1) {
+                                p.setPergunta(novaPergunta); // muda a pergunta
+                                // arqPerguntas.update(p); // atualiza o arquivo
+
+                                if (arqPerguntas.update(p)) {
+                                    System.out.println("Alteração realizada com sucesso!");
+                                } else {
+                                    System.out.println("Erro na alteração!");
+                                }
+                            } else {
+                                System.out.println("Operação Cancelada.");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            System.out.print("\nDigite enter para continuar...");
+            br.read();
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    /**
+     * Arquiva perguntas
+     */
+    public static void ArquivarPerguntas() {
+
+        System.out.println("\n------------ARQUIVAR--------------\n");
+
+        try {
+            int[] indices = indicePerguntasUsuarios.read(IDLogado); // recupera os IDs das perguntas criadas pelo usuário
+
+            Pergunta p;
+            Pergunta ativas[] = new Pergunta[indices.length];
+
+            for (int i = 0, j = 0; i < indices.length; i++) {
+                p = arqPerguntas.read(indices[i]);
+
+                if (p.getAtiva() == true) {
+                    ativas[j] = p;
+                    j++;
+                }
+            }
+
+            if (indices.length == 0 || ativas[0] == null) { // se nenhuma pergunta estiver sido cadastrada
+                System.out.println("Nenhuma pergunta cadastrada!");
+
+            } else {
+
+                // escreve as perguntas na tela
+                for (int i = 1; i <= ativas.length; i++) {
+
+                    System.out.print("\nQUESTÃO N." + i);
+                    System.out.println(ativas[i - 1]);
+
+                }
+
+                int op = -1;
+
+                System.out.println("\n0) Voltar");
+                System.out.print("\nInforme o número da questão que deseja arquivar: ");
+
+                op = leitor.nextInt() - 1;
+
+                while (op < -1 || op > ativas.length) {
+
+                    System.out.print("ERRO: Pergunta inexistente. Por favor, informe uma operação válida: ");
+                    op = leitor.nextInt() - 1;
+                }
+
+                if (op != -1) {
+                    System.out.println("\nPergunta que deseja arquivar:");
+
+                    // escreve a pergunta que o usuário escolheu
+                    p = arqPerguntas.read(indices[op]);
+                    System.out.println(p);
+
+                    int cf = -1;
+
+                    System.out.println("\nConfirmar arquivamento da pergunta.");
+
+                    System.out.println("\n1) Sim\n2) Não");
+                    System.out.print("Operação: ");
+                    cf = leitor.nextInt();
+
+                    if (cf == 1) {
+                        p.setAtiva(false); // define a pergunta como inativa
+                        // arqPerguntas.update(p); // atualiza o registro no arquivo
+
+                        String[] palavrasChaves = p.getPalavrasChave().split(";"); // recupera as palavras chave
+
+                        for (int i = 0; i < palavrasChaves.length; i++) {
+                            indicePalavrasChave.delete(palavrasChaves[i], p.getID()); // apaga cada palavra chave
+                        }
+
+                        if (arqPerguntas.update(p) == true) {
+                            System.out.println("Pergunta arquivada!");
+                        } else
+                            System.out.println("Erro ao arquivar.");
+
+                    } else if (cf == 2) {
+                        System.out.println("Operação Cancelada.");
+                    } else {
+                        System.out.println("ERRO! Operação inválida!");
+                    }
+                }
+            }
+
+            System.out.print("\nDigite enter para continuar...");
+            br.read();
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }

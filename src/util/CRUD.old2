@@ -1,0 +1,147 @@
+package util;
+
+import java.io.*;
+import java.lang.reflect.Constructor;
+import interfaces.Registro;
+import java.util.LinkedList;
+
+public class CRUD<T extends Registro> {
+
+  public final Constructor<T> constructor;
+  public HashExtensivel hashExtensivel;
+  public ArvoreBMais_Int_Int arvoreBMais;
+  private String arquivo;
+  private final String hashExtensivelrio = "database/";
+
+  public CRUD(Constructor<T> constructor, String fileName) throws Exception {
+    this.constructor = constructor;
+    this.arquivo = hashExtensivelrio + fileName;
+    File testDir = new File(hashExtensivelrio + fileName);
+    if (!testDir.exists()) {
+      testDir.mkdir();
+    }
+    this.hashExtensivel = new HashExtensivel(50, this.arquivo + ".idx", this.arquivo + ".bck");
+    this.arvoreBMais = new ArvoreBMais_Int_Int(5, this.arquivo + ".idx");
+  }
+
+  public int create(T object) throws Exception {
+    RandomAccessFile file = new RandomAccessFile(this.arquivo + ".db", "rw");
+    int ID = 1;
+    try {
+      ID += file.readInt();
+    } catch (IOException e) {
+    } finally {
+      file.seek(0);
+      file.writeInt(ID);
+    }
+    object.setID(ID);
+    file.seek(file.length());
+    byte[] byteArray = object.toByteArray();
+    long address = file.getFilePointer();
+    file.writeByte(0);
+    file.writeShort(byteArray.length);
+    file.write(byteArray);
+    file.close();
+    this.hashExtensivel.create(ID, address);
+    this.arvoreBMais.create(object.secondaryKey(), ID);
+    System.out.println("create " + object);
+    return ID;
+  }
+
+  public T read(int ID) throws Exception {
+    RandomAccessFile file = new RandomAccessFile(this.arquivo + ".db", "rw");
+    if (file.length() == 0) {
+      return null;
+    }
+    int lastID = file.readInt();
+    if (ID > lastID) {
+      return null;
+    }
+    long address = this.hashExtensivel.read(ID);
+    if (address == -1) {
+      return null;
+    }
+    file.seek(address);
+    file.readByte();
+    short dataLength = file.readShort();
+    byte[] data = new byte[dataLength];
+    file.read(data);
+    T object = this.constructor.newInstance();
+    object.fromByteArray(data);
+    return object;
+  }
+
+  public LinkedList<T> readAll(int key) throws Exception {
+    int[] ID = this.arvoreBMais.read(key);
+    LinkedList<T> lista = null;
+    if (ID[0] == 0) {
+      return lista;
+    }
+    lista = new LinkedList<T>();
+    for(int i =0; i < ID.length; i ++ ){
+     lista.add(this.read(ID[i])) ;
+    }
+    return lista;
+  }
+
+  public boolean update(T newObject) throws Exception {
+    RandomAccessFile file = new RandomAccessFile(this.arquivo + ".db", "rw");
+    if (file.length() == 0) {
+      return false;
+    }
+    int lastID = file.readInt();
+    if (newObject.getID() > lastID) {
+      return false;
+    }
+    long address = this.hashExtensivel.read((newObject.getID()));
+    if (address == -1) {
+      return false;
+    }
+    T currentObject = this.read(newObject.getID());
+    byte[] newData = newObject.toByteArray();
+    file.seek(address);
+    if (newData.length > currentObject.toByteArray().length) {
+      file.writeByte(1);
+      file.seek(file.length());
+      long newAddress = file.getFilePointer();
+      file.writeByte(0);
+      file.writeShort(newData.length);
+      file.write(newData);
+      this.hashExtensivel.update(currentObject.getID(), newAddress);
+      this.arvoreBMais.delete(currentObject.secondaryKey(), -1);
+      return this.arvoreBMais.create(newObject.secondaryKey(), newObject.getID());
+    }
+    file.readByte();
+    file.readShort();
+    file.write(newData);
+    this.arvoreBMais.delete(currentObject.secondaryKey(), -1);
+    return this.arvoreBMais.create(newObject.secondaryKey(), newObject.getID());
+  }
+
+  public boolean delete(int ID) throws Exception {
+    RandomAccessFile file = new RandomAccessFile(this.arquivo + ".db", "rw");
+    if (file.length() == 0) {
+      return false;
+    }
+    int lastID = file.readInt();
+    if (ID > lastID) {
+      return false;
+    }
+    long address = this.hashExtensivel.read(ID);
+    if (address == -1) {
+      return false;
+    }
+    T object = this.read(ID);
+    file.seek(address);
+    file.writeByte(1);
+    return this.arvoreBMais.delete(object.secondaryKey(), -1) && this.hashExtensivel.delete(ID);
+  }
+
+  public String getArquivo() {
+    return arquivo;
+  }
+
+  public void setArquivo(String arquivo) {
+    this.arquivo = arquivo;
+  }
+}
